@@ -1,4 +1,5 @@
 <?php
+//For Docker
 $urlpath="$staticFile/docker";
 $docker_pkg = "docker.io";
 $dev = "docker0";
@@ -6,6 +7,8 @@ $dockerexec = "/usr/bin/docker";
 $containerdev = "eth0";
 $dockerpsfile = "/var/local/cDistro/plug/resources/monitor-aas/ps_image.dockerfile";
 $dockerpsimagename = "ps_test";
+$dockertahoefile = "/var/local/cDistro/plug/resources/monitor-aas/tahoe_image.dockerfile";
+$dockertahoeimagename = "tahoe_test";
 
 //peerstreamer
 $pspath="/opt/peerstreamer/";
@@ -33,10 +36,15 @@ $curlprogram="/usr/bin/curl";
 $pspackages="peer_web_gui";
 
 // Mapping between service name and docker image
-$service_map = array('peerstreamer'=>'ps_test', 'tahoe-lafs'=>'tahoe_test');
+$service_map = array('peerstreamer'=>'ps_test', 'tahoe-lafs'=>'tahoe_test', 'tahoe'=>'tahoe_test', 'tahoe-introducer'=>'tahoe_test','tahoe-node'=>'tahoe_test');
+
+//Tahoe-lafs service
+$TAHOE_RESOURCES_PATH=$_SERVER['DOCUMENT_ROOT'].'/plug/resources/tahoe-lafs';
+$TAHOELAFS_CONF="tahoe-lafs.conf";
+$TAHOE_VARS=load_conffile($TAHOE_RESOURCES_PATH.'/'.$TAHOELAFS_CONF);
 
 function index() {
-	global $title, $urlpath, $docker_pkg, $staticFile, $dockerpsimagename;
+	global $title, $urlpath, $docker_pkg, $staticFile, $dockerpsimagename, $dockertahoeimagename;
 
 	$page = hlc(t("docker_title"));
 	$page .= hl(t("docker_desc"), 4);
@@ -62,6 +70,17 @@ function index() {
 		 $page .= addButton(array('label'=>t("Launch Peerstreamer Peer"), 'class'=>'btn btn-success', 'href'=>"$urlpath/ps_form?ps=peer"));
 	//	 $page .= addButton(array('label'=>t("TEST"), 'class'=>'btn btn-success', 'href'=>"$urlpath/publish_serv"));
 		 $page .= "<p><div><pre>".info_peerstreamer()."</pre></div></p>";
+		 $page .= "<br>";
+		}
+
+		if(!isTahoeCreated()) {
+		 $page .= "<div class='alert alert-error text-center'>".t("Tahoe-Lafs Container")."</div>\n";
+		 $page .= addButton(array('label'=>t("Create Tahoe-Lafs Image"), 'class'=>'btn btn-success', 'href'=>"$urlpath/create_tahoe"));
+		} else {
+	 	 $page .= "<div class='alert alert-success text-center'>".t("Tahoe-Lafs Image: <br>(".getImageName($dockertahoeimagename)." - ".getImageID($dockertahoeimagename).")")."</div>\n";
+		 $page .= addButton(array('label'=>t("Launch Tahoe Introducer"), 'class'=>'btn btn-success', 'href'=>"$urlpath/start_tahoe_introducer"));
+		 $page .= addButton(array('label'=>t("Launch Tahoe Storage"), 'class'=>'btn btn-success', 'href'=>"$urlpath/start_tahoe_node"));
+		 $page .= "<p><div><pre>".info_tahoe()."</pre></div></p>";
 		 $page .= "<br>";
 		}
 		$page .= "<div class='alert alert-error text-center'>".t("Other Services Containers")."</div>\n";
@@ -104,6 +123,16 @@ function getImageName($str) {
 function isPSCreated() {
 	global $dockerexec,$dockerpsimagename;
 	$cmd = $dockerexec." images | grep ".$dockerpsimagename;
+	$ret=execute_program_shell($cmd);
+	if(!empty($ret['output']))
+		return true;
+
+	return false;
+}
+
+function isTahoeCreated() {
+	global $dockerexec, $dockertahoeimagename;
+	$cmd = $dockerexec." images | grep ".$dockertahoeimagename;
 	$ret=execute_program_shell($cmd);
 	if(!empty($ret['output']))
 		return true;
@@ -163,6 +192,20 @@ function info_peerstreamer($trunc=""){
 	return $total;
 }
 
+function info_tahoe($trunc="") {
+	global $staticFile, $dockertahoeimagename, $avahi_tahoe_type;
+	$cmd = "docker ps -f image=${dockertahoeimagename} ".$trunc;
+	$ret = execute_program($cmd);
+	$lines = $ret['output'];
+	foreach ($lines as $l) {
+	 $sid=explode(" ", $l)[0];
+	if($sid == "CONTAINER") { $total .=$l."<br>"; continue; }
+	 $l .= " ".addButton(array('label'=>t("Stop"), 'class'=>'btn btn-success', 'href'=>"${staticFile}/docker/stop_service?sid=".$sid))."<br>\n";
+	 $total .= $l;
+	}
+	return $total;
+}
+
 function create_peerstreamer(){
 	global $dev, $urlpath, $staticFile, $dockerpsfile, $dockerpsimagename;
 	if (!file_exists($dockerpsfile)) {
@@ -179,6 +222,26 @@ function create_peerstreamer(){
 	$page .= addButton(array('label'=>t('Back'),'href'=>$staticFile.'/docker'));
 
 	return array('type' => 'render','page' => $page);
+}
+
+function create_tahoe(){
+	global $dev, $urlpath, $staticFile, $dockertahoefile, $dockertahoeimagename;
+	if (!file_exists($dockertahoefile)) {
+		$page = "<pre>The dockerfile could not be located, your Cloudy version may need to be updated.</pre>";
+		$page .= addButton(array('label'=>t('Back'),'href'=>$staticFile.'/docker'));
+		return array('type' => 'render','page' => $page);
+	}
+
+	//Needs to be run as root most probably
+	$cmd = "docker build -t ${dockertahoeimagename} - < ".$dockertahoefile;
+	execute_program_detached($cmd);
+
+	$page = "<pre>Building of Tahoe-lafs Image has begun in background, it may take some time to finish.</pre>";
+	$page .= addButton(array('label'=>t('Back'),'href'=>$staticFile.'/docker'));
+
+	return array('type' => 'render','page' => $page);
+
+
 }
 
 function ps_form() {
@@ -318,7 +381,7 @@ function unpublish_service($service, $port) {
 
 	$temp="";
 //	$sid=trim(getContainerId($port));
-	//May need necessary update to container information on Monitor-aaS
+	//May need necessary update to container information on Monitor-aAS
 	//instead of just unpublishing
 	$temp .= avahi_unpublish($service,$port);
 //	$temp .= addButton(array('label'=>t('Back'),'href'=>$staticFile.'/docker'));
@@ -398,6 +461,63 @@ function stop_service() {
 	$page .= ptxt(execute_program_shell($cmd)['output']);
 	//For now we do not remove containers, should be changed because of harddisk space
 //	$page .= ptxt(execute_program_shell($cmd1)['output']);
+
+	$page .= addButton(array('label'=>t('Back'),'href'=>$staticFile.'/docker'));
+
+	return array('type'=>'render','page'=>$page);
+
+}
+
+function start_tahoe_introducer() {
+	global $webpage, $staticFile, $urlpath, $dockertahoeimagename, $dockerexec, $TAHOE_VARS;
+	$endcmd = "&& /bin/bash"; //The end command has to stay up in foreground for docker to continue the container
+
+	$page = "";
+
+	$page .= "<p>Tahoe-Lafs Introducer (For tests, Running with default values)</p>";
+	
+	$startcmd = $TAHOE_VARS['TAHOE_ETC_INITD_FILE']." start ".$TAHOE_VARS['INTRODUCER_DIRNAME'];
+	$expPorts = "-p 8228:8228";
+	$internal = trim(execute_program_shell("docker run -i ${dockertahoeimagename} cat ".$TAHOE_VARS['DAEMON_HOMEDIR']."/introducer/introducer.port")['output']);
+	$expPorts .= " -p ${internal}:${internal}";
+	
+	$cmd = $dockerexec." run -tid ${expPorts} ${dockertahoeimagename} /bin/bash -c '".$startcmd." ".$endcmd."'";
+	$ret = execute_program_shell($cmd)['output'];
+	$page .= ptxt($ret);
+
+	$page .= addButton(array('label'=>t("Tahoe Introducer"), 'class'=>'btn btn-success', 'href'=>"$urlpath/start_tahoe_introducer"));
+	$page .= addButton(array('label'=>t("Tahoe Storage"), 'class'=>'btn btn-success', 'href'=>"$urlpath/start_tahoe_node"));
+
+	$page .= addButton(array('label'=>t('Back'),'href'=>$staticFile.'/docker'));
+
+	return array('type'=>'render','page'=>$page);
+
+}
+
+function start_tahoe_node() {
+	global $webpage, $staticFile, $urlpath, $dockertahoeimagename, $dockerexec, $TAHOE_VARS;
+	$endcmd = "&& /bin/bash"; //The end command has to stay up in foreground for docker to continue the container
+
+	$page = "";
+
+	$page .= "<p>Tahoe-Lafs Storage (For tests, Running with default values)</p>";
+	
+	$introducer_pb="pb:\/\/isqvnlij2vkvxciu2zi226o4lbadr7pr@172.17.0.175:39906,127.0.0.1:39906,10.1.26.2:39906\/introducer"; //static for now
+	//Change introducer!
+	$r = trim(execute_program_shell("docker run -i ${dockertahoeimagename} /bin/bash /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh node change introducer.furl ".$introducer_pb)['output']);
+	
+
+	$startcmd = $TAHOE_VARS['TAHOE_ETC_INITD_FILE']." start ".$TAHOE_VARS['NODE_DIRNAME'];
+	$expPorts = "-p 3456:3456";
+	$internal = trim(execute_program_shell("docker run -i ${dockertahoeimagename} cat ".$TAHOE_VARS['DAEMON_HOMEDIR']."/node/client.port")['output']);
+	$expPorts .= " -p ${internal}:${internal}";
+	$cmd = $dockerexec." run -tid ${expPorts} ${dockertahoeimagename} /bin/bash -c '".$startcmd." ".$endcmd."'";
+	
+	$ret = execute_program_shell($cmd)['output'];
+	$page .= ptxt($ret);
+
+	$page .= addButton(array('label'=>t("Tahoe Introducer"), 'class'=>'btn btn-success', 'href'=>"$urlpath/start_tahoe_introducer"));
+	$page .= addButton(array('label'=>t("Tahoe Storage"), 'class'=>'btn btn-success', 'href'=>"$urlpath/start_tahoe_node"));
 
 	$page .= addButton(array('label'=>t('Back'),'href'=>$staticFile.'/docker'));
 
