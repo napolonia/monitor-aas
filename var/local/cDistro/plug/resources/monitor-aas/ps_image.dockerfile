@@ -77,6 +77,8 @@ ENV urlstream=rtsp://10.139.40.81:554/live/ch01_0 \
 ##                                docker stop <container>
 #############
 
-### Add after to use the cached builds of the images
+### Add after to use the cached builds of the previous images
 
 RUN sed -i -e 's/.$SHELL "start"/#$SHELL "start"/g' /var/local/cDistro/plug/resources/peerstreamer/pscontroller
+
+RUN apt-get install -y net-tools

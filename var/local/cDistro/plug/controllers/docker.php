@@ -177,33 +177,49 @@ function info_docker(){
 
 function info_peerstreamer($trunc=""){
 	global $dev, $staticFile,$dockerpsimagename, $avahi_ps_type;
-	$cmd = "docker ps -f image=${dockerpsimagename} ".$trunc;
-	$ret = execute_program($cmd);
-	//Foreach line add a button
-	$lines = $ret['output'];
-	foreach ($lines as $l) {
-	 //First line does not count
-	  $sid = explode(" ", $l)[0];
-	  if($sid == "CONTAINER") { $total .=$l."<br>"; continue;}
-	  $l .= " ".addButton(array('label'=>t("Stop"), 'class'=>'btn btn-success', 'href'=>"${staticFile}/docker/stop_service?sid=".$sid))."<br>\n";
-	  $total .= $l;
-	}
+	$total = "";
+	//It will now get json docker ps and show as a html table
+
+	$cmd = "python3 /var/local/cDistro/plug/resources/monitor-aas/dockerpsjson.py";
+	$json = execute_program_shell($cmd);
+
+	$total .= json_to_table(json_decode(trim($json['output']),true), $dockerpsimagename);
 
 	return $total;
 }
 
 function info_tahoe($trunc="") {
 	global $staticFile, $dockertahoeimagename, $avahi_tahoe_type;
-	$cmd = "docker ps -f image=${dockertahoeimagename} ".$trunc;
-	$ret = execute_program($cmd);
-	$lines = $ret['output'];
-	foreach ($lines as $l) {
-	 $sid=explode(" ", $l)[0];
-	if($sid == "CONTAINER") { $total .=$l."<br>"; continue; }
-	 $l .= " ".addButton(array('label'=>t("Stop"), 'class'=>'btn btn-success', 'href'=>"${staticFile}/docker/stop_service?sid=".$sid))."<br>\n";
-	 $total .= $l;
-	}
+	$total = "";
+	//It will now get json docker ps and show as a html table
+
+	$cmd = "python3 /var/local/cDistro/plug/resources/monitor-aas/dockerpsjson.py";
+	$json = execute_program_shell($cmd);
+
+	$total .= json_to_table(json_decode(trim($json['output']),true), $dockertahoeimagename);
 	return $total;
+}
+
+function json_to_table($json, $service) {
+	$arr = array("CONTAINER ID","IMAGE","COMMAND","CREATED","STATUS","PORTS","NAMES");
+
+	$table = "<table width=100%>";
+	$table .= "<tr>";
+	foreach ($arr as $p) $table .= "<td>".$p."</td>";
+	$table .= "</tr>";
+
+	foreach ($json as $line){
+	  if(strpos($line["IMAGE"], $service) !== false) {
+		$table .= "<tr>";
+		foreach ($arr as $p) $table .="<td>".str_replace(", ",",<br>",$line[$p])."</td>";
+		//now we are going to add the stop button
+		$table .= "<td>".addButton(array('label'=>t("Stop"), 'class'=>'btn btn-success', 'href'=>"${staticFile}/docker/stop_service?sid=".$line["CONTAINER ID"]))."</td>\n";
+		$table .= "</tr>";
+	  }
+	}
+	$table .= "</table>";
+
+	return $table;
 }
 
 function create_peerstreamer(){
@@ -456,6 +472,11 @@ function stop_service() {
 	$cmd1 = "docker rm ".$sid;
 	$page .= "<p> For now will just: docker stop <containerid>, but this should be changed in future</p>";
 	
+	//Ports if there are more than one
+	$ports = explode("\n",$port);
+	if (count($ports) > 1) $port = $ports[1]; //should be the second one
+	//to be sure 8228 is not the one!
+
 	//Unpublishing service from avahi/serf
 	$page .= unpublish_service($service, $port);
 	$page .= ptxt(execute_program_shell($cmd)['output']);
@@ -468,8 +489,10 @@ function stop_service() {
 
 }
 
+
 function start_tahoe_introducer() {
 	global $webpage, $staticFile, $urlpath, $dockertahoeimagename, $dockerexec, $TAHOE_VARS;
+	$description = "Tahoe-LAFS-Grid";
 	$endcmd = "&& /bin/bash"; //The end command has to stay up in foreground for docker to continue the container
 
 	$page = "";
@@ -484,6 +507,11 @@ function start_tahoe_introducer() {
 	$cmd = $dockerexec." run -tid ${expPorts} ${dockertahoeimagename} /bin/bash -c '".$startcmd." ".$endcmd."'";
 	$ret = execute_program_shell($cmd)['output'];
 	$page .= ptxt($ret);
+
+	//Publishing introducer
+	$page .= publish_service($avahi_tahoe_type,$description,$internal)."<br>";
+	//Publishing as before (with avahi-service may not be possible)
+	//we need to get information from inside and outside of container
 
 	$page .= addButton(array('label'=>t("Tahoe Introducer"), 'class'=>'btn btn-success', 'href'=>"$urlpath/start_tahoe_introducer"));
 	$page .= addButton(array('label'=>t("Tahoe Storage"), 'class'=>'btn btn-success', 'href'=>"$urlpath/start_tahoe_node"));
