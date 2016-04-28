@@ -24,11 +24,22 @@ nodeUpdate() {
 	#just updating information of the node on SERF
 	[[ ! -f $SERFSCR ]] && return 4 || . "$SERFSCR"
 
+	if [[ "$2" == "docker" ]]; then
+	## docker version
+	 sid=$3
+	  node_pid=$(docker exec $sid cat $NODE_PATH"/twistd.pid")
+	  node_port=$(docker exec $sid cat $NODE_PATH"/client.port")
+	  node_id=$(docker exec $sid cat $NODE_PATH"/my_nodeid")
+	  gname=$(docker exec $sid cat $GRID_NAME_FILE)
+	  OPT='{"introducer.gname":"'$gname'"}'
+	
+	else
 	node_pid=$(cat $NODE_PATH"/twistd.pid")
 	node_port=$(cat $NODE_PATH"/client.port")
 	node_id=$(cat $NODE_PATH"/my_nodeid")
 	gname=$(cat $GRID_NAME_FILE)
 	OPT='{"introducer.gname":"'$gname'"}'
+	fi
 
 	if [ -z "$N" ]; then
 	stime=$(date +%s)
@@ -37,8 +48,8 @@ nodeUpdate() {
 	ttime=$(date +%s)
 	UPD='{"node.port":"'$node_port'","node.id":"'$node_id'","node.ttime":"'$ttime'"}'
 	fi
-
-	serf_update_service $TYPE $(cat $INTRODUCER_PORT) "$UPD" "$OPT"
+echo $UPD $OPT
+#	serf_update_service $TYPE $(cat $INTRODUCER_PORT) "$UPD" "$OPT"
 
 }
 
@@ -119,11 +130,11 @@ case "$1" in
     check && (echo "UP"; exit 0) || (echo "DOWN";exit 1)
   ;;
   nodeStart)
-    nodeUpdate
+    nodeUpdate $@
   ;;
   nodeStop)
     N=1
-    nodeUpdate
+    nodeUpdate $@
   ;;
   *)
     exit 1

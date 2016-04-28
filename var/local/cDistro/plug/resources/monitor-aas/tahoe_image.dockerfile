@@ -57,3 +57,8 @@ RUN /bin/bash /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh configure n
 ### ADDING after so IT WILL update the image
 ADD http://10.1.26.2:7000/plug/resources/monitor-aas/tahoe.sh /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh
 
+## ADDing JQ and PS
+RUN echo "deb http://http.debian.net/debian wheezy-backports main" >> /etc/apt/sources.list
+RUN apt-get update
+RUN apt-get -t wheezy-backports install -y --force-yes jq
+RUN apt-get install -y --force-yes procps

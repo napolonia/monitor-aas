@@ -34,6 +34,9 @@ gather_information() {
 	  docker_peerstreamer)
 		obj=$(docker_peerstreamer $sid $port)
 	;;
+	  docker_tahoe-lafs)
+		obj=$(docker_tahoe-lafs $sid $port)
+	;;
 	  synchthing)
 		shift
 		obj=$(synchthing_info "$@")
@@ -50,6 +53,22 @@ gather_information() {
 	#other services => depends upon the service itself
 
 	echo "$obj" | jq -c .
+}
+
+docker_tahoe-lafs() {
+	local PORT
+	local SID
+
+	SID=$1
+	PORT=$2
+
+	info=$(docker inspect $SID |jq -c .)
+	cstate=$(echo $info | jq -c .[].State)
+	cargs=$(echo $info | jq -c .[].Args)
+	ccreated=$(echo $info | jq -c .[].Created)
+	## we can get more information from here
+
+	echo '{"container.state":'$cstate"}" | jq -c ". + {\"container.args\":$cargs}" | jq -c ". + {\"container.created\":$ccreated}"
 }
 
 docker_peerstreamer() {
@@ -75,6 +94,12 @@ peerstreamer_info() {
 	PORT=$1
 	js=$(/bin/bash $PSPATH/pscontroller info json)
 	
+	if [ -z $PORT ] 
+	then
+	 ### maybe not exit complete, but try and find a port .. 
+	 exit
+	fi
+
 	## cut all other except the one that has PORT
 	## gather with the rest of information
 	tmp=$(echo "$js"|jq -c .[])
@@ -120,7 +145,7 @@ get_nodetime() {
 
 tahoe_lafs_info() {
 
-	PID_FILE=$(cat "/var/lib/tahoe-lafs/introducer/twistd.pid")
+	PID_FILE=$(cat "/var/lib/tahoe-lafs/introducer/twistd.pid" 2> /dev/null)
 	GRID_NAME_FILE=$(cat "/var/lib/tahoe-lafs/introducer/grid.name")
 	INTRODUCER_FURL=$(cat "/var/lib/tahoe-lafs/introducer/introducer.furl")
 	if [ -z "$INTRODUCER_FURL" ]; then
@@ -138,9 +163,13 @@ tahoe_lafs_info() {
 	iport='"introducer.port":"'$INTRODUCER_PORT'",'
 	wport='"introducer.web":"http://'$(ip r|grep src|grep 10\.|awk '{FS=" "}{print $9}')":"$WEB_PORT'",'
 	stime='"introducer.'$(get_stime)','
+	PID_FILE=$(cat "/var/lib/tahoe-lafs/introducer/twistd.pid" 2> /dev/null)
+	if [ ! -z "$PID_FILE" ]; then
 	rtime='"introducer.'$(get_rtime $PID_FILE)','
 	icpu='"introducer.cpu":'$(echo "{" $(cpu_usage_by_process $PID_FILE 5) "}"|jq -c .[])','
 	imem='"introducer.memory":'$(echo "{" $(memory_usage_by_process $PID_FILE 5) "}"|jq -c .[])
+	fi
+
 	echo "{"$pid$gridname$ifurl$iport$wport$stime$rtime$icpu$imem"}"
 
 }
@@ -236,7 +265,7 @@ case "$1" in
 	;;
   gather_information)
 	shift
-	gather_information $1 $2 $3 "$@"
+	gather_information $@
 	;;
   *)
 	exit

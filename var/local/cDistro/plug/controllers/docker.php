@@ -9,6 +9,7 @@ $dockerpsfile = "/var/local/cDistro/plug/resources/monitor-aas/ps_image.dockerfi
 $dockerpsimagename = "ps_test";
 $dockertahoefile = "/var/local/cDistro/plug/resources/monitor-aas/tahoe_image.dockerfile";
 $dockertahoeimagename = "tahoe_test";
+$dockertahoename = "tahoe_lafs";
 
 //peerstreamer
 $pspath="/opt/peerstreamer/";
@@ -318,7 +319,8 @@ function ps_publish_post() {
 
 function start_peerstreamer($url,$ip,$port,$description,$ps){
 	global $urlpath,$staticFile,$containerdev,$dockerexec,$dockerpsimagename,$avahi_ps_type;
-	$myip = "127.0.0.1"; //should be either the 10. range ip or the container ip !!!
+	//$myip = "127.0.0.1"; //THIS NEEDS TO CHANGE!!!! TO THE CONTAINER ADDRESS!!!!!
+	$myip = "'\\\"'$(ip r | grep 172. | awk '\''{print $9}'\'')'\\\"'";
 	$endcmd = "&& /bin/bash"; //The end command has to stay up in foreground for docker to continue the container
 
 	if($ps == "source")
@@ -333,20 +335,20 @@ function start_peerstreamer($url,$ip,$port,$description,$ps){
 	$cmds = "connectudp ${ip} ${port} ${myip} ${iport} ${containerdev}"; //to see if its correct
 
 	//Exporting ports either the source or the peer iport
-	$expPorts = "-p ${port}:${port}";
-	if(isset($iport)) $expPorts = "-p ${iport}:${iport}";
+	if(isset($iport)) $port = $iport; //$expPorts = "-p ${iport}:${iport}";
+	$expPorts = "-p ${port}:${port}/udp";
+	$expPorts .= " -p ${port}:${port}";
 	
 	//IF /var/run/pspeers.conf is not there than we need to create otherwise it will bug
 	$startcmd = "touch /var/run/pspeers.conf &&";
 
-	$cmd = $dockerexec." run -tid ${expPorts} ${dockerpsimagename} /bin/bash -c '".$startcmd." /bin/bash /var/local/cDistro/plug/resources/peerstreamer/pscontroller ".$cmds." ".$endcmd."'";
+	$cmd = $dockerexec." run --name ${avahi_ps_type}_${ps}_${port} -tid ${expPorts} ${dockerpsimagename} /bin/bash -c '".$startcmd." /bin/bash /var/local/cDistro/plug/resources/peerstreamer/pscontroller ".$cmds." ".$endcmd."'";
 	$ret = execute_program_shell($cmd);
 	setFlash(t('Docker Peerstreamer Container'),"success");
 
 	$page = "CONTAINERID: ".trim($ret['output'])."<br>";
 
 	//Need to account for errors and not publish!!!!!
-	if(isset($iport)) $port = $iport;
 	if(empty($description)) $description = "Republishing";
 
 	$page .= publish_service($avahi_ps_type,$description,$port)."<br>";
@@ -470,7 +472,7 @@ function stop_service() {
 
 	$cmd = "docker stop ".$sid;
 	$cmd1 = "docker rm ".$sid;
-	$page .= "<p> For now will just: docker stop <containerid>, but this should be changed in future</p>";
+//	$page .= "<p> For now will just: docker stop <containerid>, but this should be changed in future</p>";
 	
 	//Ports if there are more than one
 	$ports = explode("\n",$port);
@@ -481,7 +483,7 @@ function stop_service() {
 	$page .= unpublish_service($service, $port);
 	$page .= ptxt(execute_program_shell($cmd)['output']);
 	//For now we do not remove containers, should be changed because of harddisk space
-//	$page .= ptxt(execute_program_shell($cmd1)['output']);
+	$page .= ptxt(execute_program_shell($cmd1)['output']);
 
 	$page .= addButton(array('label'=>t('Back'),'href'=>$staticFile.'/docker'));
 
@@ -491,7 +493,7 @@ function stop_service() {
 
 
 function start_tahoe_introducer() {
-	global $webpage, $staticFile, $urlpath, $dockertahoeimagename, $dockerexec, $TAHOE_VARS;
+	global $webpage, $staticFile, $urlpath, $dockertahoeimagename, $dockerexec, $TAHOE_VARS, $dockertahoename, $avahi_tahoe_type;
 	$description = "Tahoe-LAFS-Grid";
 	$endcmd = "&& /bin/bash"; //The end command has to stay up in foreground for docker to continue the container
 
@@ -504,7 +506,7 @@ function start_tahoe_introducer() {
 	$internal = trim(execute_program_shell("docker run -i ${dockertahoeimagename} cat ".$TAHOE_VARS['DAEMON_HOMEDIR']."/introducer/introducer.port")['output']);
 	$expPorts .= " -p ${internal}:${internal}";
 	
-	$cmd = $dockerexec." run -tid ${expPorts} ${dockertahoeimagename} /bin/bash -c '".$startcmd." ".$endcmd."'";
+	$cmd = $dockerexec." run --name ${dockertahoename}_${internal} -tid ${expPorts} ${dockertahoeimagename} /bin/bash -c '".$startcmd." ".$endcmd."'";
 	$ret = execute_program_shell($cmd)['output'];
 	$page .= ptxt($ret);
 
@@ -523,14 +525,14 @@ function start_tahoe_introducer() {
 }
 
 function start_tahoe_node() {
-	global $webpage, $staticFile, $urlpath, $dockertahoeimagename, $dockerexec, $TAHOE_VARS;
+	global $webpage, $staticFile, $urlpath, $dockertahoeimagename, $dockerexec, $TAHOE_VARS, $dockertahoename;
 	$endcmd = "&& /bin/bash"; //The end command has to stay up in foreground for docker to continue the container
 
 	$page = "";
 
 	$page .= "<p>Tahoe-Lafs Storage (For tests, Running with default values)</p>";
 	
-	$introducer_pb="pb:\/\/isqvnlij2vkvxciu2zi226o4lbadr7pr@172.17.0.175:39906,127.0.0.1:39906,10.1.26.2:39906\/introducer"; //static for now
+	$introducer_pb="pb:\/\/aquxdwm6p4x7rjfhp63ntony23sq24gf@172.17.0.175:39906,127.0.0.1:39906,10.1.26.2:39906\/introducer"; //static for now
 	//Change introducer!
 	$r = trim(execute_program_shell("docker run -i ${dockertahoeimagename} /bin/bash /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh node change introducer.furl ".$introducer_pb)['output']);
 	
@@ -539,9 +541,13 @@ function start_tahoe_node() {
 	$expPorts = "-p 3456:3456";
 	$internal = trim(execute_program_shell("docker run -i ${dockertahoeimagename} cat ".$TAHOE_VARS['DAEMON_HOMEDIR']."/node/client.port")['output']);
 	$expPorts .= " -p ${internal}:${internal}";
-	$cmd = $dockerexec." run -tid ${expPorts} ${dockertahoeimagename} /bin/bash -c '".$startcmd." ".$endcmd."'";
+	$cmd = $dockerexec." run --name ${dockertahoename}_node_${internal} -tid ${expPorts} ${dockertahoeimagename} /bin/bash -c '".$startcmd." ".$endcmd."'";
 	
 	$ret = execute_program_shell($cmd)['output'];
+
+	//Node is not published but updated in serf
+	$pubcmd = "/bin/bash /usr/share/avahi-service/files/tahoe-lafs.service nodeStart docker ${ret}";
+
 	$page .= ptxt($ret);
 
 	$page .= addButton(array('label'=>t("Tahoe Introducer"), 'class'=>'btn btn-success', 'href'=>"$urlpath/start_tahoe_introducer"));

@@ -40,14 +40,14 @@ RUN mkdir -p /opt/peerstreamer ;\
 RUN mkdir -p /var/local/cDistro/plug/resources/peerstreamer/
 
 ## Add works if it comes from web, otherwise it will look from base dir (which there is none when using STDIN as the dockerfile)
-ADD http://10.1.26.2:7000/plug/resources/peerstreamer/pscontroller /var/local/cDistro/plug/resources/peerstreamer/pscontroller
-ADD http://10.1.26.2:7000/plug/resources/peerstreamer/ps_shell /var/local/cDistro/plug/resources/peerstreamer/ps_shell
+ADD http://10.139.40.91:7000/plug/resources/peerstreamer/pscontroller /var/local/cDistro/plug/resources/peerstreamer/pscontroller
+ADD http://10.139.40.91:7000/plug/resources/peerstreamer/ps_shell /var/local/cDistro/plug/resources/peerstreamer/ps_shell
 
 ## Changing pscontroller script because there is no ip_local_port_range available
 RUN sed -i -e 's-\tread lowerPort upperPort < \/proc\/sys\/net\/ipv4\/ip_local_port_range$-\tlowerPort=32768\n\tupperPort=61000-' /var/local/cDistro/plug/resources/peerstreamer/pscontroller
 
 RUN mkdir -p /var/local/cDistro/plug/resources/monitor-aas/
-ADD http://10.1.26.2:7000/plug/resources/monitor-aas/common.sh /var/local/cDistro/plug/resources/monitor-aas/common.sh
+ADD http://10.139.40.91:7000/plug/resources/monitor-aas/common.sh /var/local/cDistro/plug/resources/monitor-aas/common.sh
 
 # These are just for testing
 ENV urlstream=rtsp://10.139.40.81:554/live/ch01_0 \
@@ -82,3 +82,5 @@ ENV urlstream=rtsp://10.139.40.81:554/live/ch01_0 \
 RUN sed -i -e 's/.$SHELL "start"/#$SHELL "start"/g' /var/local/cDistro/plug/resources/peerstreamer/pscontroller
 
 RUN apt-get install -y net-tools
+
+#RUN sed -i -e "s/.local udpport=\${3.*/local udpport=${3:-\"\$(ip r|grep 172.|awk \'{print \$9}\')\"}/g" /var/local/cDistro/plug/resources/peerstreamer/pscontroller

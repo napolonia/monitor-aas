@@ -148,7 +148,7 @@ remMyService() {
 		fi
 	done
 	
-	for i in "$myEServices"
+	for i in $myEServices
 	do
 		if [ ! -z "$defEServices" ]
 		then
@@ -413,7 +413,7 @@ serf_find_(){
 	defServices=""
 	myServices=$($SERFBIN members -status=$SERFSTATUS -format json|jq -c -M ".members[].tags.${SERFTAG}"|sed 's/^"\(.*\)"$/\1/'|grep -v "^null$"|descomprimir|sed "s/'/"'"'"/g"|jq -c -M .[])
 
-	for i in "$myServices"
+	for i in $myServices
 	do
 		if [ ! -z "$defServices" ]
 		then 
@@ -557,7 +557,7 @@ serf_update_service() {
 
 	old=$(getAllButOneServices $_TYPE $_PORT $SERFETAG)
 	defEServices=""
-        for i in "$old"
+        for i in $old
         do
            defEServices=$i","$defEServices
         done
