@@ -281,16 +281,15 @@ updateEService() {
 	_type=$3
 	_port=$4
 	_tf=${5:-""}
-
 	#Update is done by removing last V value and adding the new
 	# if ttime
-	_tmp=$(echo "$_old"|grep -P '"h":"'$_type'_'$_port'"*,'| jq .v[])
-	if [ -z "$(echo "$_tmp"|sed "s/\s\+//g")" ]; then
+	_tmp=$(echo "$_old"|grep -P '"h":"'$_type'_'$_port'"*,'| jq -c .v[])
+	if [ -z "$_tmp" ]; then
 	  echo $_new
 	  return
 	fi
 
-	_tmp=($(echo "[""$_tmp""]"| jq -c ".[]"))
+	_tmp=($_tmp)
 	if [ ! -z "$_tf" ]; then
 	 n=$(( ${#_tmp[@]} ))
 	else
