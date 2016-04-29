@@ -129,11 +129,11 @@ change() {
 
 	if [[ "$WHO" == "node" ]]; then
 	FILE_TO_CHANGE=$DAEMON_HOMEDIR/$NODE_DIRNAME/$TAHOE_CONFIG_FILE
-	elif [[ "WHAT" == "introducer" ]]; then
+	elif [[ "WHO" == "introducer" ]]; then
 	FILE_TO_CHANGE=$DAEMON_HOMEDIR/$INTRODUCER_DIRNAME/$TAHOE_CONFIG_FILE
 	fi
 
-	sed -i "s/^"$WHAT".*$/"$WHAT" = "$TO"/" $FILE_TO_CHANGE
+	sed -i "s%^"$WHAT".*$%"$WHAT" = "$TO"%" $FILE_TO_CHANGE
 }
 
 help() {

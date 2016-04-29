@@ -14,13 +14,13 @@ RUN apt-get install -y rsyslog
 
 ## Adding files to container
 RUN mkdir -p /var/local/cDistro/plug/resources/monitor-aas/
-ADD http://10.1.26.2:7000/plug/resources/monitor-aas/common.sh /var/local/cDistro/plug/resources/monitor-aas/common.sh
+ADD http://10.139.40.91:7000/plug/resources/monitor-aas/common.sh /var/local/cDistro/plug/resources/monitor-aas/common.sh
 
 RUN mkdir -p /var/local/cDistro/plug/resources/tahoe-lafs/
-ADD http://10.1.26.2:7000/plug/resources/tahoe-lafs/tahoe-lafs.init.d /var/local/cDistro/plug/resources/tahoe-lafs/tahoe-lafs.init.d
-ADD http://10.1.26.2:7000/plug/resources/tahoe-lafs/tahoe-lafs.etc.default /var/local/cDistro/plug/resources/tahoe-lafs/tahoe-lafs.etc.default
+ADD http://10.139.40.91:7000/plug/resources/tahoe-lafs/tahoe-lafs.init.d /var/local/cDistro/plug/resources/tahoe-lafs/tahoe-lafs.init.d
+ADD http://10.139.40.91:7000/plug/resources/tahoe-lafs/tahoe-lafs.etc.default /var/local/cDistro/plug/resources/tahoe-lafs/tahoe-lafs.etc.default
 ## Added to configure tahoe-lafs
-#ADD http://10.1.26.2:7000/plug/resources/monitor-aas/tahoe.sh /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh
+#ADD http://10.139.40.91:7000/plug/resources/monitor-aas/tahoe.sh /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh
 
 
 RUN apt-get install -y tahoe-lafs
@@ -40,7 +40,7 @@ RUN mkdir /var/lib/tahoe-lafs/node
 RUN "/usr/bin/tahoe" create-introducer "/var/lib/tahoe-lafs/introducer"
 RUN "/usr/bin/tahoe" create-node "/var/lib/tahoe-lafs/node"
 
-ADD http://10.1.26.2:7000/plug/resources/monitor-aas/tahoe.sh /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh
+ADD http://10.139.40.91:7000/plug/resources/monitor-aas/tahoe.sh /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh
 
 ## Since from here we do not know which will be thefor introducer or node
 # Ill configure for both and just run one of them each time
@@ -55,7 +55,7 @@ RUN /bin/bash /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh configure n
 # tahoe start /var/lib/tahoe-lafs/introducer or node ## --syslog may not be working
 # or twistd -ny /var/lib/tahoe-lafs/introducer/tahoe-introducer.tac
 ### ADDING after so IT WILL update the image
-ADD http://10.1.26.2:7000/plug/resources/monitor-aas/tahoe.sh /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh
+#ADD http://10.1.26.2:7000/plug/resources/monitor-aas/tahoe.sh /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh
 
 ## ADDing JQ and PS
 RUN echo "deb http://http.debian.net/debian wheezy-backports main" >> /etc/apt/sources.list

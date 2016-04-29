@@ -284,8 +284,8 @@ updateEService() {
 
 	#Update is done by removing last V value and adding the new
 	# if ttime
-	_tmp=$(echo "$_old"|grep -P '"h":"'$_type'_'$_port'"*,'|cut -d'[' -f2|cut -d']' -f1)
-	if [ -z $(echo "$_tmp"|sed "s/\s\+//g") ]; then
+	_tmp=$(echo "$_old"|grep -P '"h":"'$_type'_'$_port'"*,'| jq .v[])
+	if [ -z "$(echo "$_tmp"|sed "s/\s\+//g")" ]; then
 	  echo $_new
 	  return
 	fi
@@ -608,7 +608,7 @@ searchV() {
 	do
 	 tmp=$(echo $i|jq -c ".service"|sed 's/\"//g')
 	 tmp2=$(echo $i|jq -c ".port"|sed 's/\"//g')
-	 if [ "$tmp" == $(echo "$_TYPE"|sed 's/\"//g') ] || [ $(echo "$_PORT"|sed 's/\"//g') == "$tmp2" ]; then
+	 if [ "$tmp" == "$(echo "$_TYPE"|sed 's/\"//g')" ] || [ "$(echo "$_PORT"|sed 's/\"//g')" == "$tmp2" ]; then
 	  ret=$i
 	 fi
          #Assuming _OPTS comes in json

@@ -9,7 +9,8 @@ $dockerpsfile = "/var/local/cDistro/plug/resources/monitor-aas/ps_image.dockerfi
 $dockerpsimagename = "ps_test";
 $dockertahoefile = "/var/local/cDistro/plug/resources/monitor-aas/tahoe_image.dockerfile";
 $dockertahoeimagename = "tahoe_test";
-$dockertahoename = "tahoe_lafs";
+$dockertahoeiname = "tahoe_introducer";
+$dockertahoenname = "tahoe_storage";
 
 //peerstreamer
 $pspath="/opt/peerstreamer/";
@@ -67,8 +68,8 @@ function index() {
 		 $page .= addButton(array('label'=>t("Create PeerStreamer Image"), 'class'=>'btn btn-success', 'href'=>"$urlpath/create_peerstreamer"));
 		} else {
 	 	 $page .= "<div class='alert alert-success text-center'>".t("Peerstreamer Image: <br>(".getImageName($dockerpsimagename)." - ".getImageID($dockerpsimagename).")")."</div>\n";
-		 $page .= addButton(array('label'=>t("Launch Peerstreamer Source"), 'class'=>'btn btn-success', 'href'=>"$urlpath/ps_form?ps=source"));
-		 $page .= addButton(array('label'=>t("Launch Peerstreamer Peer"), 'class'=>'btn btn-success', 'href'=>"$urlpath/ps_form?ps=peer"));
+		 $page .= addButton(array('label'=>t("Publish a Video Stream"), 'class'=>'btn btn-success', 'href'=>"$urlpath/ps_form?ps=source"));
+		 $page .= addButton(array('label'=>t("Connect to Peer"), 'class'=>'btn btn-success', 'href'=>"$urlpath/ps_form?ps=peer"));
 	//	 $page .= addButton(array('label'=>t("TEST"), 'class'=>'btn btn-success', 'href'=>"$urlpath/publish_serv"));
 		 $page .= "<p><div><pre>".info_peerstreamer()."</pre></div></p>";
 		 $page .= "<br>";
@@ -213,6 +214,11 @@ function json_to_table($json, $service) {
 	  if(strpos($line["IMAGE"], $service) !== false) {
 		$table .= "<tr>";
 		foreach ($arr as $p) $table .="<td>".str_replace(", ",",<br>",$line[$p])."</td>";
+		//For Peerstreamer we should add Peer View button
+		if(strpos($line["NAMES"],"_peer_") !== false)
+		$table .= "<td>".addButton(array('label'=>t("Watch"), 'class'=>'btn btn-success', 'href'=>"${staticFile}/docker/psviewer?u=".getPeerStream($line["CONTAINER ID"])))."</td>\n";
+		//For Tahoe maybe we need to add other buttons
+
 		//now we are going to add the stop button
 		$table .= "<td>".addButton(array('label'=>t("Stop"), 'class'=>'btn btn-success', 'href'=>"${staticFile}/docker/stop_service?sid=".$line["CONTAINER ID"]))."</td>\n";
 		$table .= "</tr>";
@@ -221,6 +227,22 @@ function json_to_table($json, $service) {
 	$table .= "</table>";
 
 	return $table;
+}
+
+function getPeerStream($sid) {
+	global $_SERVER;
+
+	//We are going to get the stream url for this container how?
+	$ip = $_SERVER['SERVER_ADDR'];
+	if (empty($ip))
+		$ip = trim(execute_program_shell("ip r | grep 10.| awk '{print $9}'")['output']);
+	$port = getServicePort($sid);
+	//Assuming for now its rtsp
+	$type = "rtsp";
+
+	$url = $type."://".$ip.":".$port."/";
+
+	return urlencode($url);
 }
 
 function create_peerstreamer(){
@@ -357,6 +379,13 @@ function start_peerstreamer($url,$ip,$port,$description,$ps){
 	return $page;
 }
 
+function test_pub() {
+	$page = "";
+
+	$page .= publish_service("tahoe-lafs","nothing", 40024);
+	return(array('type' => 'render','page' => $page));
+}
+
 function publish_service($service, $description, $port, $opts=array()) {
 	global $dev,$dockerexec;
 	//here we should publish services as was before
@@ -371,12 +400,14 @@ function publish_service($service, $description, $port, $opts=array()) {
 
 	//Internal:
 	$sid=trim(getContainerId($port));
+	//Because we need to wait a bit till tahoe is executed in the container
+	sleep(2);
 	$cmd = $dockerexec." exec ".$sid." ".getExtraCmd($service,$port,$opts);
 	$iobj = execute_program_shell($cmd)['output'];
 
 	//External:
 	$cmd = $dockerexec." inspect ".$sid." | jq -c ."; //From here we can take out information
-	$cmd = "/bin/bash /var/local/cDistro/plug/resources/monitor-aas/common.sh gather_information docker_".$service." ".$sid;
+	$cmd = trim(getExtraCmd("docker_".$service, $sid));
 	$eobj = execute_program_shell($cmd)['output'];
 
 	//Need to merge both arrays as is, array_merge does not do that properly
@@ -416,7 +447,7 @@ function getContainerId($port) {
 }
 
 function getExtraCmd($service, $port="", $opts="") {
-	//Each service has its own way to gather information
+	//Each service has its own way to gather extra information
 	switch ($service) {
 	case 'peerstreamer':
 	//getting extra info using the common.sh file?
@@ -425,8 +456,15 @@ function getExtraCmd($service, $port="", $opts="") {
 	//Not sure yet, either common.sh or tahoe-lafs.service
 	return "/bin/bash /var/local/cDistro/plug/resources/monitor-aas/common.sh gather_information tahoe-lafs";
 	case 'synchthing':
-	///bin/bash /var/local/cDistro/plug/resources/monitor-aas/common.sh gather_information synchthing xml_config_file_inside_container
+ 	///bin/bash /var/local/cDistro/plug/resources/monitor-aas/common.sh gather_information synchthing xml_config_file_inside_container
 	return "";
+
+	//In case of docker extra info
+	case 'docker_peerstreamer':
+	return "/bin/bash /var/local/cDistro/plug/resources/monitor-aas/common.sh gather_information ".$service." ".$port;
+	case 'docker_tahoe-lafs':
+	return "/bin/bash /var/local/cDistro/plug/resources/monitor-aas/common.sh gather_information ".$service." ".$port;
+
 	default:
 	//maybe has default it should be starting time?
 	return "";
@@ -491,9 +529,44 @@ function stop_service() {
 
 }
 
+function vlcobject($url){
+
+        $o = "";
+        $o .= '<div id="vlc-plugin" >';
+        $o .= '<!-- <object classid="clsid:9BE31822-FDAD-461B-AD51-BE1D1C159921" codebase="http://download.videolan.org/pub/videolan/vlc/last/win32/axvlc.cab"></object> -->';
+        $o .= '<embed pluginspage="http://www.videolan.org"';
+        $o .= 'type="application/x-vlc-plugin"';
+        $o .= 'version="VideoLAN.VLCPlugin.2"';
+        $o .= 'width="720" volume="50"';
+        $o .= 'height="480"';
+        $o .= 'name="vlc" id="vlc"';
+        $o .= 'autoplay="true" allowfullscreen="true" windowless="true" loop="true" toolbar="false"';
+        $o .= ' target="'.$url.'">';
+        $o .= '</embed>';
+        $o .= '</div>';
+
+        return($o);
+}
+
+function psviewer(){
+
+        global $staticFile,$title;
+
+	$url = urldecode($_GET['u']);
+
+        $page = hlc(t($title));
+        $page .= par(t("PeerStreamer s'est   executant en segon pla, si tens el connector de vlc podr  s veure el video al teu navegador."));
+        $page .= vlcobject($url);
+        $page .= par(t("Alternativament pots accedir al video usant el seg  ent enlla   al teu player preferit."));
+        $page .= ptxt($url );
+
+	$page .= addButton(array('label'=>t('List'),'href'=>$staticFile.'/docker'));
+        return(array('type' => 'render','page' => $page));
+}
+
 
 function start_tahoe_introducer() {
-	global $webpage, $staticFile, $urlpath, $dockertahoeimagename, $dockerexec, $TAHOE_VARS, $dockertahoename, $avahi_tahoe_type;
+	global $webpage, $staticFile, $urlpath, $dockertahoeimagename, $dockerexec, $TAHOE_VARS, $dockertahoeiname, $avahi_tahoe_type;
 	$description = "Tahoe-LAFS-Grid";
 	$endcmd = "&& /bin/bash"; //The end command has to stay up in foreground for docker to continue the container
 
@@ -501,12 +574,14 @@ function start_tahoe_introducer() {
 
 	$page .= "<p>Tahoe-Lafs Introducer (For tests, Running with default values)</p>";
 	
+	//CONFIGURATION SHOULD NOT BE STATIC!!!
 	$startcmd = $TAHOE_VARS['TAHOE_ETC_INITD_FILE']." start ".$TAHOE_VARS['INTRODUCER_DIRNAME'];
 	$expPorts = "-p 8228:8228";
 	$internal = trim(execute_program_shell("docker run -i ${dockertahoeimagename} cat ".$TAHOE_VARS['DAEMON_HOMEDIR']."/introducer/introducer.port")['output']);
 	$expPorts .= " -p ${internal}:${internal}";
+	$expPorts .= " -p ${internal}:${internal}/udp";
 	
-	$cmd = $dockerexec." run --name ${dockertahoename}_${internal} -tid ${expPorts} ${dockertahoeimagename} /bin/bash -c '".$startcmd." ".$endcmd."'";
+	$cmd = $dockerexec." run --name ${dockertahoeiname}_${internal} -tid ${expPorts} ${dockertahoeimagename} /bin/bash -c '".$startcmd." ".$endcmd."'";
 	$ret = execute_program_shell($cmd)['output'];
 	$page .= ptxt($ret);
 
@@ -525,28 +600,33 @@ function start_tahoe_introducer() {
 }
 
 function start_tahoe_node() {
-	global $webpage, $staticFile, $urlpath, $dockertahoeimagename, $dockerexec, $TAHOE_VARS, $dockertahoename;
+	global $webpage, $staticFile, $urlpath, $dockertahoeimagename, $dockerexec, $TAHOE_VARS, $dockertahoenname;
 	$endcmd = "&& /bin/bash"; //The end command has to stay up in foreground for docker to continue the container
 
 	$page = "";
 
 	$page .= "<p>Tahoe-Lafs Storage (For tests, Running with default values)</p>";
-	
-	$introducer_pb="pb:\/\/aquxdwm6p4x7rjfhp63ntony23sq24gf@172.17.0.175:39906,127.0.0.1:39906,10.1.26.2:39906\/introducer"; //static for now
-	//Change introducer!
-	$r = trim(execute_program_shell("docker run -i ${dockertahoeimagename} /bin/bash /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh node change introducer.furl ".$introducer_pb)['output']);
-	
 
-	$startcmd = $TAHOE_VARS['TAHOE_ETC_INITD_FILE']." start ".$TAHOE_VARS['NODE_DIRNAME'];
+	//SHOULD NOT BE STATIC!!!!!!
+	$introducer_pb="pb://mpaishrzgopngzdsct4aobfdkzdnjys4@172.17.0.175:40024,127.0.0.1:40024,10.139.40.91:40024/introducer"; //static for now
+	//Change introducer!
+
+//	$r = trim(execute_program_shell("docker run -i ${dockertahoeimagename} /bin/bash /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh node change introducer.furl ".$introducer_pb)['output']);
+	
+	$startcmd = "/bin/bash /var/local/cDistro/plug/resources/monitor-aas/tahoe.sh node change introducer.furl ".$introducer_pb." && ";
+	$startcmd .= $TAHOE_VARS['TAHOE_ETC_INITD_FILE']." start ".$TAHOE_VARS['NODE_DIRNAME'];
 	$expPorts = "-p 3456:3456";
 	$internal = trim(execute_program_shell("docker run -i ${dockertahoeimagename} cat ".$TAHOE_VARS['DAEMON_HOMEDIR']."/node/client.port")['output']);
 	$expPorts .= " -p ${internal}:${internal}";
-	$cmd = $dockerexec." run --name ${dockertahoename}_node_${internal} -tid ${expPorts} ${dockertahoeimagename} /bin/bash -c '".$startcmd." ".$endcmd."'";
-	
+	$expPorts .= " -p ${internal}:${internal}/udp";
+
+	$cmd = $dockerexec." run --name ${dockertahoenname}_node_${internal} -tid ${expPorts} ${dockertahoeimagename} /bin/bash -c '".$startcmd." ".$endcmd."'";
+//$page .= $cmd;	
 	$ret = execute_program_shell($cmd)['output'];
 
 	//Node is not published but updated in serf
 	$pubcmd = "/bin/bash /usr/share/avahi-service/files/tahoe-lafs.service nodeStart docker ${ret}";
+//	$page .= ptxt(execute_program_shell($pubcmd)['output']);
 
 	$page .= ptxt($ret);
 

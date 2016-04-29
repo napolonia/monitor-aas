@@ -130,6 +130,11 @@ get_rtime() {
 	pid=$1
 	opt=${2:-""}
 	
+	if [ -z $pid ]; then
+	 rtime=0
+	echo 'rtime":"'$rtime'"'
+	exit 
+	fi
 	if [ -z $opt ]; then
 	  rtime=$(ps aux|grep -v grep|grep -v avahi|grep $pid|awk 'BEGIN {FS=" "}{print $10}')
 	else
@@ -154,7 +159,9 @@ tahoe_lafs_info() {
 	INTRODUCER_PORT=$(cat "/var/lib/tahoe-lafs/introducer/introducer.port")
 	WEB_PORT=$(cat "/var/lib/tahoe-lafs/introducer/web.port")
 
+	if [ ! -z "$PID_FILE" ]; then
 	pid='"introducer.pid":"'$PID_FILE'",'
+	fi
 	gridname='"introducer.gname":"'$GRID_NAME_FILE'",'
 	ifurl='"introducer.furl":"'$INTRODUCER_FURL'",'
 	if [ -z "$INTRODUCER_FURL" ]; then
@@ -164,11 +171,14 @@ tahoe_lafs_info() {
 	wport='"introducer.web":"http://'$(ip r|grep src|grep 10\.|awk '{FS=" "}{print $9}')":"$WEB_PORT'",'
 	stime='"introducer.'$(get_stime)','
 	PID_FILE=$(cat "/var/lib/tahoe-lafs/introducer/twistd.pid" 2> /dev/null)
-	if [ ! -z "$PID_FILE" ]; then
+	## to fix something here, why no pid yet?? nobody knows
+	if [ -z $PID_FILE ]; then
+	echo "{"$pid$gridname$ifurl$iport$wport${stime::-1}"}"
+	exit
+	fi
 	rtime='"introducer.'$(get_rtime $PID_FILE)','
 	icpu='"introducer.cpu":'$(echo "{" $(cpu_usage_by_process $PID_FILE 5) "}"|jq -c .[])','
 	imem='"introducer.memory":'$(echo "{" $(memory_usage_by_process $PID_FILE 5) "}"|jq -c .[])
-	fi
 
 	echo "{"$pid$gridname$ifurl$iport$wport$stime$rtime$icpu$imem"}"
 
