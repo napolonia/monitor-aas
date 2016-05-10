@@ -52,7 +52,15 @@ do
          #No need for this h to appear anymore
          continue
         fi
-	tmph='{"h":'$(hname "$h")',"v":['$(lastVWithoutTTime "$h")']}'
+        lastv=$(lastVWithoutTTime "$h")
+	if [ ! -z "$lastv" ]
+        then
+	tmph='{"h":'$(hname "$h")',"v":['"$lastv"']}'
+	else
+	#No need for empty v
+	continue
+	fi
+
 	if [ -z "$txt" ]; then
 		txt="$tmph"
 	else

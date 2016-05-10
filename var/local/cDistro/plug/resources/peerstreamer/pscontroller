@@ -360,8 +360,15 @@ moreInfo() {
 	local port
 
 	port=$1
+
+	if [ -f "/var/local/cDistro/plug/resources/monitor-aas/common.sh" ] && [ "$(/bin/bash var/local/cDistro/plug/resources/monitor-aas/common.sh enabled)" == "true" ];
+	then
 	# common.sh now handles the information
 	echo "einfo="$(/bin/bash /var/local/cDistro/plug/resources/monitor-aas/common.sh gather_information peerstreamer $port | tr ',' ';')
+	else
+	#### only if avahi_extra is true
+	echo ""
+	fi
 }
 
 # Install PeerStreamer from source

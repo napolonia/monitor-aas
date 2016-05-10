@@ -640,7 +640,7 @@ function createNode_get(){
 
 function createNode_post(){
 	global $TAHOE_VARS;
-	global $staticFile;
+	global $staticFile,$avahi_extra;
 
 	$page = "";
 	$buttons = "";
@@ -735,6 +735,8 @@ function createNode_post(){
 
 	//Maybe we need to create introducer.furl here!
 	foreach (execute_program( 'ps aux | grep tahoe | grep node | grep -v grep')['output'] as $k => $v) { $postStart[] = $v; }
+	
+	if(isset($avahi_extra) && $avahi_extra)
 	execute_program_shell('/bin/sh /usr/share/avahi-service/files/tahoe-lafs.service nodeStart  >/dev/null 2>&1');
 
 	$postStartAll = "";
@@ -954,9 +956,10 @@ function restartAndPublishIntroducer(){
 
 function startNode(){
 	global $staticFile;
-	global $TAHOE_VARS;
+	global $TAHOE_VARS, $avahi_extra;
 
    $pid = detached_exec($TAHOE_VARS['TAHOE_ETC_INITD_FILE'].' start node >/dev/null 2>&1');
+  if(isset($avahi_extra) && $avahi_extra)
    execute_program_shell('/bin/sh /usr/share/avahi-service/files/tahoe-lafs.service nodeStart  >/dev/null 2>&1 ');
 
 	setFlash(t('tahoe-lafs_flash_starting_storage'));
@@ -965,9 +968,10 @@ function startNode(){
 
 function stopNode(){
 	global $staticFile;
-	global $TAHOE_VARS;
+	global $TAHOE_VARS, $avahi_extra;
 
    $pid = detached_exec($TAHOE_VARS['TAHOE_ETC_INITD_FILE'].' stop node >/dev/null 2>&1');
+  if(isset($avahi_extra) && $avahi_extra)
    execute_program_shell('/bin/sh /usr/share/avahi-service/files/tahoe-lafs.service nodeStop  >/dev/null 2>&1');
 
 	setFlash(t('tahoe-lafs_flash_stopping_storage'));

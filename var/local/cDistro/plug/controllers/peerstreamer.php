@@ -265,7 +265,7 @@ function pserror($error) {
 
 function _pssource($url,$ip,$port,$description){
 
-	global $pspath,$psprogram,$title,$vlcpath,$vlcprogram,$vlcuser,$psutils,$avahi_type;
+	global $pspath,$psprogram,$title,$vlcpath,$vlcprogram,$vlcuser,$psutils,$avahi_type,$avahi_extra;
 
 	$page = "";
 	$device = getCommunityDev()['output'][0];
@@ -297,14 +297,19 @@ function _pssource($url,$ip,$port,$description){
 	// Publish in avahi system.
 	$page .= par(t('Published this stream.'));
 	$description = str_replace(' ', '', $description);
-
-	//New way of dealing is calling common.sh
-	$line=execute_program_shell("/bin/bash /var/local/cDistro/plug/resources/monitor-aas/common.sh gather_information ".$avahi_type." ".$port)['output'];
-	$einfo="einfo=".trim(strtr($line, array('['=>'',']'=>'',' '=>'',','=>';')));
-	//2x Addslashes needed!
-	$einfo=addslashes(addslashes($einfo));
-	$temp = avahi_publish($avahi_type, $description, $port, $einfo);
-	$page .= ptxt($temp);
+	//Only use extra monitor IF avahi_extra is true
+	if (isset($avahi_extra) && $avahi_extra) {
+		//New way of dealing is calling common.sh
+		$line=execute_program_shell("/bin/bash /var/local/cDistro/plug/resources/monitor-aas/common.sh gather_information ".$avahi_type." ".$port)['output'];
+		$einfo="einfo=".trim(strtr($line, array('['=>'',']'=>'',' '=>'',','=>';')));
+		//2x Addslashes needed!
+		$einfo=addslashes(addslashes($einfo));
+		$temp = avahi_publish($avahi_type, $description, $port, $einfo);
+		$page .= ptxt($temp);
+	} else {
+		$temp = avahi_publish($avahi_type, $description, $port, "");
+		$page .= ptxt($temp); 
+	}
 
 	$page .= addButton(array('label'=>t('Back'),'href'=>$staticFile.'/peerstreamer'));
 

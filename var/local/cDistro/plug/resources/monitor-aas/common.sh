@@ -65,7 +65,8 @@ docker_tahoe-lafs() {
 	info=$(docker inspect $SID |jq -c .)
 	cstate=$(echo $info | jq -c .[].State)
 	cargs=$(echo $info | jq -c .[].Args)
-	ccreated=$(echo $info | jq -c .[].Created)
+	ccreated=$(echo $info | jq -c -r .[].Created)
+        ccreated=$(date --date="$ccreated" +%s)
 	## we can get more information from here
 
 	echo '{"container.state":'$cstate"}" | jq -c ". + {\"container.args\":$cargs}" | jq -c ". + {\"container.created\":$ccreated}"
@@ -82,7 +83,9 @@ docker_peerstreamer() {
 	info=$(docker inspect $SID | jq -c .)
 	cstate=$(echo $info | jq -c .[].State)
 	cargs=$(echo $info | jq -c .[].Args)
-	ccreated=$(echo $info | jq -c .[].Created)
+	ccreated=$(echo $info | jq -c -r .[].Created)
+	ccreated=$(date --date="$ccreated" +%s)
+
 	## We can get more information from here
 
 	echo '{"container.state":'$cstate"}" | jq -c ". + {\"container.args\":$cargs}" | jq -c ". + {\"container.created\":$ccreated}"
@@ -263,6 +266,16 @@ memory_usage_by_process() {
 	}
 }
 
+status() {
+	# gets the variable from globals
+	setfile="/var/local/cDistro/config/global.php"
+	[ ! -f "$setfile" ] && avahi_extra="false" || {
+	avahi_extra=$(cat "$setfile" | grep -o 'avahi_extra.*' | cut -d'=' -f2| cut -d';' -f1)
+	avahi_extra=$(echo "$avahi_extra" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+	}
+	echo $avahi_extra
+}
+
 
 case "$1" in 
   cpu_usage_by_process)
@@ -276,6 +289,10 @@ case "$1" in
   gather_information)
 	shift
 	gather_information $@
+	;;
+  enabled)
+	shift
+	status
 	;;
   *)
 	exit
