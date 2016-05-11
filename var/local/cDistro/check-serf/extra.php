@@ -4,7 +4,8 @@
 	$embbed=true;
 	$db="/db/neighbours.db";
 	$start_time="1400000000"; // 2014
-if($embbed) {
+	
+	if($embbed) {
 	//embbeding with cloudy elements
 	require "../config/global.php";
 	require "../core.php";
@@ -21,16 +22,19 @@ if($embbed) {
         require "../lib/avahi.php";
 
 	$staticPath=$staticPath."/";
+	//Need to modify staticFile for the menus to work
+	$staticFile="/index.php";
+
 	$css = array('../../css/bootstrap.min','../../css/bootstrap-responsive.min', '../../css/jquery.dataTables','../../css/main', 'vis.min', 'mine');
 	$js = array('../../js/jquery-1.11.0.min','../../js/jquery.dataTables.min','../../js/bootstrap.min','vis.min');
 	$js_end = array('../../js/main');
-
+	
 	require "../templates/header.php";
         require "../templates/menu.php";
         require "../templates/begincontent.php";
         require "../templates/flash.php";
 
-	echo hlc(t("Monitor-aaS"));
+	echo hlc(t("Monitor-aAS"));
 	echo hl(t("Graph"),4);
 
 	echo "<div id=\"line-chart-legend\"></div><div id=\"canvas\"></div></br>";
@@ -44,12 +48,13 @@ if($embbed) {
 
 	echo "<br>".addButton(array('label'=>t("Reload Graph"),'class'=>'btn btn-success','href'=>'./extra.php')); //buttons
 	echo "".addButton(array('label'=>t("Get Data"),'class'=>'btn btn-success','href'=>'./extra.php?func=getdata')); //buttons
+	echo "".addButton(array('label'=>t("Back"),'class'=>'btn btn-success','href'=>'/..'.$staticFile.'/monitor-aas')); //buttons
 
         require "../templates/endcontent.php";
         require "../templates/footer.php";
         require "../templates/endpage.php";
 
-} else {
+	} else {
 	echo "<!DOCTYPE html>";
 	echo "<html><head><title>Analisis</title><script src=\"js/Chart.js\"></script><script src=\"js/vis.min.js\"></script><link href=\"css/vis.min.css\" rel=\"stylesheet\" type=\"text/css\"/><link href=\"css/mine.css\" rel=\"stylesheet\" type=\"text/css\"/>";
 	echo "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, user-scalable=no\">";
@@ -67,9 +72,9 @@ if($embbed) {
 	 getdata();
 	else
 	 start_graph();
-}
+	}
 
-	
+
 	//echo "</body></html>";
 	//echo "";
 	//GET DATA globals func=getdata
